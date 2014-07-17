@@ -1,6 +1,7 @@
 "use strict";
 
 var pageData = [];
+var editsOverTime = [];
 
 var width = 960,
     height = 500;
@@ -85,4 +86,15 @@ editStream.onValue(function(results) {
     update(pageData);
 });
 
-// TODO: Calculate the rate of edits per second
+// Calculate the rate of edits over time
+var messageCount = messageStream.scan(0, function(value) {
+    return ++value;
+});
+
+var sampledMessages = messageCount.sample(5000);
+var totalEditsBeforeLastSample = 0;
+sampledMessages.onValue(function(value) {
+    editsOverTime.push((value - totalEditsBeforeLastSample) / 5.0);
+    totalEditsBeforeLastSample = value;
+    return value;
+});
