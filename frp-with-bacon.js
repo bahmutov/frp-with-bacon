@@ -82,7 +82,8 @@ function update(updates, newUsers) {
     // Update the ranges of the chart to reflect the new data
     if (updates.length > 0)   {
         xRange.domain(d3.extent(updates, function(d) { return d.x; }));
-        yRange.domain([d3.min(updates, function(d) { return d.y; }), d3.max(updates, function(d) { return d.y; })]);
+        yRange.domain([d3.min(updates, function(d) { return d.y; }), 
+                       d3.max(updates, function(d) { return d.y; })]);
     }
     
     // If the first new user event is now off the chart, remove it
@@ -167,7 +168,8 @@ newUserStream.onValue(function(results) {
     update(updatesOverTime, newUserTimes);
 });
 
-// Filter the update stream for unspecified events, which we're taking to mean edits in this case
+// Filter the update stream for unspecified events, which we're taking to mean 
+// edits in this case
 var editStream = updateStream.filter(function(update) {
     return update.type === "unspecified";
 });
