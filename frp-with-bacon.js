@@ -14,12 +14,12 @@ var newUserTimes = [];
 
 var svg = d3.select("svg")
     .attr("width", width)
-    .attr("height", height);
+    .attr("height", height + 200);
 
 var xRange = d3.time.scale().range([margins.left, width - margins.right])
-    .domain([d3.min(updatesOverTime, function(d) { return d.x; }), d3.max(updatesOverTime, function(d) { return d.x; })]);
+    .domain([new Date(), new Date()]);
 var yRange = d3.scale.linear().range([height - margins.bottom, margins.top])
-    .domain([d3.min(updatesOverTime, function(d) { return d.y; }), d3.max(updatesOverTime, function(d) { return d.y; })]);
+    .domain([0, 0]);
 var xAxis = d3.svg.axis()
     .scale(xRange)
     .tickSize(5)
@@ -36,6 +36,7 @@ var xAxisElement = svg.append("g")
     .attr("transform", "translate(0," + (height - margins.bottom) + ")")
     .call(xAxis);
 
+// Add a label to the middle of the x axis
 var xAxisWidth = ((width - margins.right) - margins.left) / 2;
 xAxisElement.append("text")
     .attr("x", margins.left + xAxisWidth)
@@ -49,6 +50,7 @@ var yAxisElement = svg.append("g")
     .attr("transform", "translate(" + margins.left + ",0)")
     .call(yAxis);
 
+// Add a label to the middle of the y axis
 var yAxisHeight = ((height - margins.bottom) - margins.top) / 2;
 yAxisElement.append("text")
     .attr("transform", "rotate(-90)")
@@ -58,6 +60,7 @@ yAxisElement.append("text")
     .style("text-anchor", "middle")
     .text("Updates per second");
 
+// Define our line series
 var lineFunc = d3.svg.line()
     .x(function(d) { return xRange(d.x); })
     .y(function(d) { return yRange(d.y); })
@@ -68,24 +71,37 @@ var line = svg.append("path")
     .attr("stroke", "blue")
     .attr("fill", "none");
 
+// Add a text element below the chart, which will display the subject of new edits
+svg.append("text")
+    .attr("class", "edit-text")
+    .attr("transform", "translate(" + margins.left + "," + (height + 20)  + ")")
+    .attr("width", width);
+
 var updateTransitionDuration = 550;
 
-function update() {
-    xRange.domain(d3.extent(updatesOverTime, function(d) { return d.x; }));
-    yRange.domain([d3.min(updatesOverTime, function(d) { return d.y; }), d3.max(updatesOverTime, function(d) { return d.y; })]);
-    
-    var firstNewUserTime = newUserTimes[0];
-    var xAxisMin = xRange.domain()[0];
-    if (firstNewUserTime < xAxisMin) {
-        console.log(firstNewUserTime + " < " + xAxisMin);
-        newUserTimes.shift();
+function update(updates, newUsers) {
+    // Update the ranges of the chart to reflect the new data
+    if (updates.length > 0)   {
+        xRange.domain(d3.extent(updates, function(d) { return d.x; }));
+        yRange.domain([d3.min(updates, function(d) { return d.y; }), d3.max(updates, function(d) { return d.y; })]);
     }
     
-    line.transition().duration(updateTransitionDuration).attr("d", lineFunc(updatesOverTime));
+    // If the first new user event is now off the chart, remove it
+    var firstNewUserTime = newUsers[0];
+    var xAxisMin = xRange.domain()[0];
+    if (firstNewUserTime < xAxisMin) {
+        newUsers.shift();
+    }
+    
+    // Update the line series on the chart
+    line.transition().duration(updateTransitionDuration).attr("d", lineFunc(updates));
+    
+    // Update the axes on the chart
     svg.selectAll("g.x.axis").transition().duration(updateTransitionDuration).call(xAxis);
     svg.selectAll("g.y.axis").transition().duration(updateTransitionDuration).call(yAxis);
     
-    var points = svg.selectAll("circle").data(updatesOverTime);
+    // Render the points in the line series
+    var points = svg.selectAll("circle").data(updates);
     var pointsEnter = points.enter().append("circle")
         .attr("r", 2)
         .style("fill", "blue");
@@ -98,11 +114,12 @@ function update() {
         .transition().duration(updateTransitionDuration)
         .remove();
     
-    var newUserLines = svg.selectAll("rect").data(newUserTimes);
+    // For any new user events, render a translucent red line on the chart
+    var newUserLines = svg.selectAll("rect").data(newUsers);
     var newUsersEnter = newUserLines.enter().append("rect")
         .attr("width", 5)
         .attr("fill-opacity", 0.001)
-        .attr("fill", "red")
+        .attr("fill", "red");
     
     var newUsersUpdate = newUserLines.transition().duration(updateTransitionDuration)
         .attr("x", function(d) { return xRange(d); })
@@ -113,53 +130,18 @@ function update() {
     var newUsersExit = newUserLines.exit()
         .transition().duration(updateTransitionDuration)    
         .remove();
-    
-//    var lastElement = data[data.length - 1];
-//    console.log(yRange(5));
-//    console.log(yRange(0));
-//    svg.append("line")
-//        .attr("x1", xRange(lastElement.x))
-//        .attr("x2", xRange(lastElement.x))
-//        .attr("y1", margins.top)
-//        .attr("y2", height - margins.bottom)
-//        .attr("stroke", "red");
-    
-//    var text = svg.selectAll("text").data(data);
-//
-//    // UPDATE
-//    // Update old elements as needed.
-//    text.attr("class", "update")
-//        .transition()
-//        .duration(550)
-//        .style("fill-opacity", 1e-6)
-//        .transition()
-//        .duration(550)
-//        .style("fill-opacity", 1)
-//        .text(function (d) { return d; });
-//    
-//    // ENTER
-//    // Create new elements as needed.
-//    var enterText = svg.selectAll("text").data(data).enter()
-//        .append("text")
-//        .attr("class", "enter")
-//        .attr("dy", ".35em")
-//        .attr("y", -60)
-//        .style("fill-opacity", 1e-6)
-//        .text(function (d) { return d; })
-//        .transition()
-//        .duration(750)
-//        .attr("y", 0)
-//        .style("fill-opacity", 1);
-//
-//    // EXIT
-//    // Remove old elements as needed.
-//    text.exit()
-//        .attr("class", "exit")
-//        .transition()
-//        .duration(750)
-//        .attr("y", 60)
-//        .style("fill-opacity", 1e-6)
-//        .remove();
+}
+
+var updateEditText = function(latestEdit)   {
+    var text = svg.selectAll("text.edit-text").data(latestEdit);
+
+    text.transition()
+        .duration(updateTransitionDuration)
+        .style("fill-opacity", 1e-6)
+        .transition()
+        .duration(updateTransitionDuration)
+        .style("fill-opacity", 1)
+        .text(function (d) { return d; });
 }
 
 // Create our websocket to get wiki updates
@@ -190,7 +172,7 @@ var editStream = updateStream.filter(function(update) {
     return update.type === "unspecified";
 });
 editStream.onValue(function(results) {
-    console.log(JSON.stringify(results));
+    updateEditText([results.content]);
 });
 
 // Calculate the rate of updates over time
@@ -201,15 +183,14 @@ var updateCount = updateStream.scan(0, function(value) {
 var sampledUpdates = updateCount.sample(2000);
 var totalUpdatesBeforeLastSample = 0;
 sampledUpdates.onValue(function(value) {
-    var now = new Date();
     updatesOverTime.push({
-        x: now, 
+        x: new Date(), 
         y:(value - totalUpdatesBeforeLastSample) / 2.0
     });
     if (updatesOverTime.length > 20)  {
         updatesOverTime.shift();
     }
     totalUpdatesBeforeLastSample = value;
-    update();
+    update(updatesOverTime, newUserTimes);
     return value;
 });
