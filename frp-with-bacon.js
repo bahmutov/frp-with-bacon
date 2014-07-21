@@ -1,5 +1,8 @@
 "use strict";
 
+var updatesOverTime = [];
+var newUserTimes = [];
+
 var width = 960,
     height = 600,
     margins = {
@@ -8,9 +11,6 @@ var width = 960,
         left: 70,
         right: 20
     };
-
-var updatesOverTime = [];
-var newUserTimes = [];
 
 var svg = d3.select("svg")
     .attr("width", width)
@@ -67,7 +67,6 @@ var lineFunc = d3.svg.line()
     .interpolate("linear");
 
 var line = svg.append("path")
-    .attr("d", lineFunc(updatesOverTime))
     .attr("stroke", "blue")
     .attr("fill", "none");
 
@@ -75,7 +74,7 @@ var line = svg.append("path")
 svg.append("text")
     .attr("class", "edit-text")
     .attr("transform", "translate(" + margins.left + "," + (height + 20)  + ")")
-    .attr("width", width);
+    .attr("width", width - margins.left);
 
 var updateTransitionDuration = 550;
 
@@ -118,7 +117,7 @@ function update(updates, newUsers) {
     var newUserLines = svg.selectAll("rect").data(newUsers);
     var newUsersEnter = newUserLines.enter().append("rect")
         .attr("width", 5)
-        .attr("fill-opacity", 0.001)
+        .attr("fill-opacity", 1e-6)
         .attr("fill", "red");
     
     var newUsersUpdate = newUserLines.transition().duration(updateTransitionDuration)
@@ -165,6 +164,7 @@ var newUserStream = updateStream.filter(function(update) {
 });
 newUserStream.onValue(function(results) {
     newUserTimes.push(new Date());
+    update(updatesOverTime, newUserTimes);
 });
 
 // Filter the update stream for unspecified events, which we're taking to mean edits in this case
