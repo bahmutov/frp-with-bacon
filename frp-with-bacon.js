@@ -121,7 +121,7 @@ function update(updates, newUser) {
         .attr("class", "new-user")
         .attr("r", 40)
         .attr("fill", "green")
-        .attr("cx", width - margins.right - margins.left)
+        .attr("cx", width - margins.right - 20)
         .attr("cy", height + 20)
         .attr("opacity", 1e-6)
         .transition()
@@ -131,7 +131,7 @@ function update(updates, newUser) {
     newUserIndicator.exit()
         .transition()
         .duration(updateTransitionDuration)
-        .attr("cx", width - margins.right - margins.left)
+        .attr("cx", width - margins.right - 20)
         .attr("cy", height + 20)
         .attr("opacity", 1e-6)
         .remove();
