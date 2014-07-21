@@ -1,7 +1,6 @@
 "use strict";
 
 var updatesOverTime = [];
-var newUserTimes = [];
 
 var width = 960,
     height = 600,
@@ -78,7 +77,7 @@ svg.append("text")
 
 var updateTransitionDuration = 550;
 
-function update(updates, newUsers) {
+function update(updates, newUser) {
     // Update the ranges of the chart to reflect the new data
     if (updates.length > 0)   {
         xRange.domain(d3.extent(updates, function(d) { return d.x; }));
@@ -86,19 +85,20 @@ function update(updates, newUsers) {
                        d3.max(updates, function(d) { return d.y; })]);
     }
     
-    // If the first new user event is now off the chart, remove it
-    var firstNewUserTime = newUsers[0];
-    var xAxisMin = xRange.domain()[0];
-    if (firstNewUserTime < xAxisMin) {
-        newUsers.shift();
-    }
-    
     // Update the line series on the chart
-    line.transition().duration(updateTransitionDuration).attr("d", lineFunc(updates));
+    line.transition()
+        .duration(updateTransitionDuration)
+        .attr("d", lineFunc(updates));
     
     // Update the axes on the chart
-    svg.selectAll("g.x.axis").transition().duration(updateTransitionDuration).call(xAxis);
-    svg.selectAll("g.y.axis").transition().duration(updateTransitionDuration).call(yAxis);
+    svg.selectAll("g.x.axis")
+        .transition()
+        .duration(updateTransitionDuration)
+        .call(xAxis);
+    svg.selectAll("g.y.axis")
+        .transition()
+        .duration(updateTransitionDuration)
+        .call(yAxis);
     
     // Render the points in the line series
     var points = svg.selectAll("circle").data(updates);
@@ -106,7 +106,9 @@ function update(updates, newUsers) {
         .attr("r", 2)
         .style("fill", "blue");
     
-    var pointsUpdate = points.transition().duration(updateTransitionDuration)
+    var pointsUpdate = points
+        .transition()
+        .duration(updateTransitionDuration)
         .attr("cx", function(d) { return xRange(d.x); })
         .attr("cy", function(d) { return yRange(d.y); });
     
@@ -114,21 +116,24 @@ function update(updates, newUsers) {
         .transition().duration(updateTransitionDuration)
         .remove();
     
-    // For any new user events, render a translucent red line on the chart
-    var newUserLines = svg.selectAll("rect").data(newUsers);
-    var newUsersEnter = newUserLines.enter().append("rect")
-        .attr("width", 5)
-        .attr("fill-opacity", 1e-6)
-        .attr("fill", "red");
+    var newUserIndicator = svg.selectAll("circle.new-user").data(newUser);
+    newUserIndicator.enter().append("circle")
+        .attr("class", "new-user")
+        .attr("r", 40)
+        .attr("fill", "green")
+        .attr("cx", width - margins.right - margins.left)
+        .attr("cy", height + 20)
+        .attr("opacity", 1e-6)
+        .transition()
+        .duration(updateTransitionDuration)
+        .attr("opacity", 0.75);
     
-    var newUsersUpdate = newUserLines.transition().duration(updateTransitionDuration)
-        .attr("x", function(d) { return xRange(d); })
-        .attr("y", margins.top)
-        .attr("height", height - margins.bottom - margins.top)
-        .attr("fill-opacity", 0.5);
-    
-    var newUsersExit = newUserLines.exit()
-        .transition().duration(updateTransitionDuration)    
+    newUserIndicator.exit()
+        .transition()
+        .duration(updateTransitionDuration)
+        .attr("cx", width - margins.right - margins.left)
+        .attr("cy", height + 20)
+        .attr("opacity", 1e-6)
         .remove();
 }
 
@@ -164,8 +169,7 @@ var newUserStream = updateStream.filter(function(update) {
     return update.type === "newuser";
 });
 newUserStream.onValue(function(results) {
-    newUserTimes.push(new Date());
-    update(updatesOverTime, newUserTimes);
+    update(updatesOverTime, ["newuser"]);
 });
 
 // Filter the update stream for unspecified events, which we're taking to mean 
@@ -193,6 +197,6 @@ sampledUpdates.onValue(function(value) {
         updatesOverTime.shift();
     }
     totalUpdatesBeforeLastSample = value;
-    update(updatesOverTime, newUserTimes);
+    update(updatesOverTime, []);
     return value;
 });
