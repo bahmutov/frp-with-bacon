@@ -109,13 +109,11 @@ function update(updates) {
     // points to the end of the chart.
     if (updates.length < maxNumberOfDataPoints) {
         line.transition()
-            //.duration(samplingTime - 10)
             .ease("linear")
             .attr("d", lineFunc(updates));
         
         svg.selectAll("g.x.axis")
             .transition()
-            //.duration(samplingTime - 10)
             .ease("linear")
             .call(xAxis);
     }
@@ -123,7 +121,7 @@ function update(updates) {
     // start of the chart, and move the data over so the chart looks 
     // like it is scrolling forwards in time
     else    {
-        // Calculate the amount of translation on the x axis equates to the
+        // Calculate the amount of translation on the x axis which equates to the
         // time between two samples
         var xTranslation = xRange(updates[0].x) - xRange(updates[1].x);
         
@@ -218,7 +216,8 @@ var totalUpdatesBeforeLastSample = 0;
 sampledUpdates.onValue(function(value) {
     updatesOverTime.push({
         x: new Date(), 
-        y:(value - totalUpdatesBeforeLastSample) / (samplingTime / 1000)
+        y:(value - totalUpdatesBeforeLastSample) / 
+            (samplingTime / 1000)
     });
     if (updatesOverTime.length > maxNumberOfDataPoints)  {
         updatesOverTime.shift();
