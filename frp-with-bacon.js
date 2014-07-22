@@ -65,7 +65,17 @@ var lineFunc = d3.svg.line()
     .y(function(d) { return yRange(d.y); })
     .interpolate("linear");
 
-var line = svg.append("path")
+svg.append("defs").append("clipPath")
+    .attr("id", "clip")
+    .append("rect")
+    .attr("x", margins.left)
+    .attr("y", margins.top)
+    .attr("width", width)
+    .attr("height", height);
+
+var line = svg.append("g")
+    .attr("clip-path", "url(#clip)")
+    .append("path")
     .attr("stroke", "blue")
     .attr("fill", "none");
 
@@ -75,9 +85,19 @@ svg.append("text")
     .attr("transform", "translate(" + margins.left + "," + (height + 20)  + ")")
     .attr("width", width - margins.left);
 
-var updateTransitionDuration = 550;
+// Add a text element below the chart, which will display the times that new users
+// are added
+var newUserTextWidth = 150;
+svg.append("text")
+    .attr("class", "new-user-text")
+    .attr("fill", "green")
+    .attr("transform", "translate(" + (width - margins.right - newUserTextWidth) + "," + (height + 20)  + ")")
+    .attr("width", newUserTextWidth);
 
-function update(updates, newUser) {
+var samplingTime = 2000;
+var maxNumberOfDataPoints = 20;
+
+function update(updates) {
     // Update the ranges of the chart to reflect the new data
     if (updates.length > 0)   {
         xRange.domain(d3.extent(updates, function(d) { return d.x; }));
@@ -85,66 +105,72 @@ function update(updates, newUser) {
                        d3.max(updates, function(d) { return d.y; })]);
     }
     
-    // Update the line series on the chart
-    line.transition()
-        .duration(updateTransitionDuration)
-        .attr("d", lineFunc(updates));
+    // Until we have filled up our data window, we just keep adding data
+    // points to the end of the chart.
+    if (updates.length < maxNumberOfDataPoints) {
+        line.transition()
+            //.duration(samplingTime - 10)
+            .ease("linear")
+            .attr("d", lineFunc(updates));
+        
+        svg.selectAll("g.x.axis")
+            .transition()
+            //.duration(samplingTime - 10)
+            .ease("linear")
+            .call(xAxis);
+    }
+    // Once we have filled up the window, we then remove points from the 
+    // start of the chart, and move the data over so the chart looks 
+    // like it is scrolling forwards in time
+    else    {
+        // Calculate the amount of translation on the x axis equates to the
+        // time between two samples
+        var xTranslation = xRange(updates[0].x) - xRange(updates[1].x);
+        
+        // Transform our line series immediately, then translate it from
+        // right to left. This gives the effect of our chart scrolling
+        // forwards in time
+        line
+            .attr("d", lineFunc(updates))
+            .attr("transform", null)
+            .transition()
+            .duration(samplingTime - 20)
+            .ease("linear")
+            .attr("transform", "translate(" + xTranslation + ", 0)");
+        
+        svg.selectAll("g.x.axis")
+            .transition()
+            .duration(samplingTime - 20)
+            .ease("linear")
+            .call(xAxis);
+    }
     
-    // Update the axes on the chart
-    svg.selectAll("g.x.axis")
-        .transition()
-        .duration(updateTransitionDuration)
-        .call(xAxis);
     svg.selectAll("g.y.axis")
         .transition()
-        .duration(updateTransitionDuration)
         .call(yAxis);
-    
-    // Render the points in the line series
-    var points = svg.selectAll("circle").data(updates);
-    var pointsEnter = points.enter().append("circle")
-        .attr("r", 2)
-        .style("fill", "blue");
-    
-    var pointsUpdate = points
+}
+
+var textUpdateTransitionDuration = 550;
+var updateNewUser = function(newUser)   {
+    var text = svg.selectAll("text.new-user-text").data(newUser);
+
+    text.transition()
+        .duration(textUpdateTransitionDuration)
+        .style("fill-opacity", 1e-6)
         .transition()
-        .duration(updateTransitionDuration)
-        .attr("cx", function(d) { return xRange(d.x); })
-        .attr("cy", function(d) { return yRange(d.y); });
-    
-    var pointsExit = points.exit()
-        .transition().duration(updateTransitionDuration)
-        .remove();
-    
-    var newUserIndicator = svg.selectAll("circle.new-user").data(newUser);
-    newUserIndicator.enter().append("circle")
-        .attr("class", "new-user")
-        .attr("r", 40)
-        .attr("fill", "green")
-        .attr("cx", width - margins.right - 20)
-        .attr("cy", height + 20)
-        .attr("opacity", 1e-6)
-        .transition()
-        .duration(updateTransitionDuration)
-        .attr("opacity", 0.75);
-    
-    newUserIndicator.exit()
-        .transition()
-        .duration(updateTransitionDuration)
-        .attr("cx", width - margins.right - 20)
-        .attr("cy", height + 20)
-        .attr("opacity", 1e-6)
-        .remove();
+        .duration(textUpdateTransitionDuration)
+        .style("fill-opacity", 1)
+        .text(function (d) { return d; });
 }
 
 var updateEditText = function(latestEdit)   {
     var text = svg.selectAll("text.edit-text").data(latestEdit);
 
     text.transition()
-        .duration(updateTransitionDuration)
+        .duration(textUpdateTransitionDuration)
         .style("fill-opacity", 1e-6)
         .transition()
-        .duration(updateTransitionDuration)
+        .duration(textUpdateTransitionDuration)
         .style("fill-opacity", 1)
         .text(function (d) { return d; });
 }
@@ -169,7 +195,8 @@ var newUserStream = updateStream.filter(function(update) {
     return update.type === "newuser";
 });
 newUserStream.onValue(function(results) {
-    update(updatesOverTime, ["newuser"]);
+    var format = d3.time.format("%X");
+    updateNewUser(["New user at: " + format(new Date())]);
 });
 
 // Filter the update stream for unspecified events, which we're taking to mean 
@@ -178,7 +205,7 @@ var editStream = updateStream.filter(function(update) {
     return update.type === "unspecified";
 });
 editStream.onValue(function(results) {
-    updateEditText([results.content]);
+    updateEditText(["Last edit: " + results.content]);
 });
 
 // Calculate the rate of updates over time
@@ -186,17 +213,17 @@ var updateCount = updateStream.scan(0, function(value) {
     return ++value;
 });
 
-var sampledUpdates = updateCount.sample(2000);
+var sampledUpdates = updateCount.sample(samplingTime);
 var totalUpdatesBeforeLastSample = 0;
 sampledUpdates.onValue(function(value) {
     updatesOverTime.push({
         x: new Date(), 
-        y:(value - totalUpdatesBeforeLastSample) / 2.0
+        y:(value - totalUpdatesBeforeLastSample) / (samplingTime / 1000)
     });
-    if (updatesOverTime.length > 20)  {
+    if (updatesOverTime.length > maxNumberOfDataPoints)  {
         updatesOverTime.shift();
     }
     totalUpdatesBeforeLastSample = value;
-    update(updatesOverTime, []);
+    update(updatesOverTime);
     return value;
 });
